@@ -277,14 +277,21 @@ where
             let algo = new_algo(netinfo, sec_keys[&id].clone(), pub_keys.clone(), rng);
             // set the first x nodes to be slow
             let p = 10;
+            let first_div = 0.75;
+            let prob = p as f64 / 20.0;
+            // maintains the total transmission time constant
+            //let remaining_time = 1.0 - prob / first_div;
+            //let second_div = (1.0 - prob) / remaining_time;
+            let q = prob * first_div;
+            let second_div = (1.0-q) / (1.0-prob);
             let hw = if id.0 < p {
                 let mut hw_clone = hw_quality.clone();
-                hw_clone.inv_bw = hw_clone.inv_bw.div_f64(0.5);
+                hw_clone.inv_bw = hw_clone.inv_bw.div_f64(first_div);
                 hw_clone
             }
             else {
                 let mut hw_clone = hw_quality.clone();
-                hw_clone.inv_bw = hw_clone.inv_bw.div_f64(1.5);
+                hw_clone.inv_bw = hw_clone.inv_bw.div_f64(second_div);
                 hw_clone
             };
             (id, TestNode::new(algo, hw))
