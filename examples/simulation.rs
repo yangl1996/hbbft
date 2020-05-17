@@ -96,8 +96,8 @@ pub struct HwQuality {
 impl HwQuality {
     pub fn inv_bw(&self) -> Duration {
         let draw = rand::random::<u8>();
-        let p = 0.5;
-        let q = 0.3;
+        let p = 0.05;
+        let q = 0.0375;
         let thld = (255.0 * p) as u8;
         // half of the time the bandwidth is bad
         if draw < thld {
@@ -208,7 +208,7 @@ where
             .extend(step.output.into_iter().map(|out| (time, out)));
         self.sent_time = cmp::max(self.time, self.sent_time);
         for (target, message) in out_msgs {
-            self.sent_time += self.hw_quality.inv_bw() * message.len() as u32;
+            self.sent_time += self.hw_quality.inv_bw * message.len() as u32;
             self.out_queue.push_back(TimestampedMessage {
                 time: self.sent_time + self.hw_quality.latency,
                 sender_id: self.id.clone(),
@@ -275,7 +275,19 @@ where
 
         let new_node = |(id, netinfo): (NodeId, NetworkInfo<_>)| {
             let algo = new_algo(netinfo, sec_keys[&id].clone(), pub_keys.clone(), rng);
-            (id, TestNode::new(algo, hw_quality))
+            // set the first x nodes to be slow
+            let p = 10;
+            let hw = if id.0 < p {
+                let mut hw_clone = hw_quality.clone();
+                hw_clone.inv_bw = hw_clone.inv_bw.div_f64(0.5);
+                hw_clone
+            }
+            else {
+                let mut hw_clone = hw_quality.clone();
+                hw_clone.inv_bw = hw_clone.inv_bw.div_f64(1.5);
+                hw_clone
+            };
+            (id, TestNode::new(algo, hw))
         };
         let mut network = TestNetwork {
             nodes: netinfos.into_iter().map(new_node).collect(),
