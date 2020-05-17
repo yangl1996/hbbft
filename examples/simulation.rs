@@ -35,7 +35,7 @@ Options:
   -l <lag>, --lag <lag>   The network lag between sending and receiving [default: 100]
   --bw <bw>               The bandwidth, in kbit/s [default: 2000]
   --cpu <cpu>             The CPU speed, in percent of this machine's [default: 100]
-  --tx-size <size>        The size of a transaction, in bytes [default: 10]
+  --tx-size <size>        The size of a transaction, in bytes [default: 200]
 ";
 
 #[derive(Deserialize)]
@@ -91,6 +91,22 @@ pub struct HwQuality {
     inv_bw: Duration,
     /// The CPU time multiplier: how much slower, in percent, is this node than your computer?
     cpu_factor: u32,
+}
+
+impl HwQuality {
+    pub fn inv_bw(&self) -> Duration {
+        let draw = rand::random::<u8>();
+        let p = 0.5;
+        let q = 0.3;
+        let thld = (255.0 * p) as u8;
+        // half of the time the bandwidth is bad
+        if draw < thld {
+            return self.inv_bw.mul_f64(q / p);
+        }
+        else {
+            return self.inv_bw.mul_f64((1.0-q) / (1.0-p));
+        }
+    }
 }
 
 /// A "node" running an instance of the algorithm `D`.
@@ -192,7 +208,7 @@ where
             .extend(step.output.into_iter().map(|out| (time, out)));
         self.sent_time = cmp::max(self.time, self.sent_time);
         for (target, message) in out_msgs {
-            self.sent_time += self.hw_quality.inv_bw * message.len() as u32;
+            self.sent_time += self.hw_quality.inv_bw() * message.len() as u32;
             self.out_queue.push_back(TimestampedMessage {
                 time: self.sent_time + self.hw_quality.latency,
                 sender_id: self.id.clone(),
@@ -363,8 +379,8 @@ impl EpochInfo {
             network.message_count() / network.nodes.len(),
             match NumberPrefix::decimal(network.message_size() as f64 / network.nodes.len() as f64)
             {
-                Standalone(bytes) => format!("{:3.0}  ", bytes),
-                Prefixed(prefix, n) => format!("{:3.0} {}", n, prefix),
+                Standalone(bytes) => format!("{:3.3}  ", bytes),
+                Prefixed(prefix, n) => format!("{:3.3} {}", n, prefix),
             }
         );
     }
