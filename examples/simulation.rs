@@ -101,10 +101,10 @@ impl HwQuality {
         let thld = (255.0 * p) as u8;
         // half of the time the bandwidth is bad
         if draw < thld {
-            return self.inv_bw.mul_f64(q / p);
+            return self.inv_bw.div_f64(q / p);
         }
         else {
-            return self.inv_bw.mul_f64((1.0-q) / (1.0-p));
+            return self.inv_bw.div_f64((1.0-q) / (1.0-p));
         }
     }
 }
