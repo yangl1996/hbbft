@@ -14,7 +14,7 @@ pub enum Message {
     /// A share of the value, sent from the sender to another validator.
     Value(Proof<Vec<u8>>),
     /// A copy of the value received from the sender, multicast by a validator.
-    Echo(Proof<Vec<u8>>),
+    Echo(usize),
     /// Indicates that the sender knows that every node will eventually be able to decode.
     Ready(Digest),
     /// Indicates that this node has enough shares to decode the message with given Merkle root.
@@ -34,6 +34,7 @@ impl Distribution<Message> for Standard {
         // Create a random buffer for our proof.
         let mut buffer: [u8; 32] = [0; 32];
         rng.fill_bytes(&mut buffer);
+        let random_idx: usize = rng.gen();
 
         // Generate a dummy proof to fill broadcast messages with.
         let tree = MerkleTree::from_vec(vec![buffer.to_vec()]);
@@ -41,7 +42,7 @@ impl Distribution<Message> for Standard {
 
         match message_type {
             "value" => Message::Value(proof),
-            "echo" => Message::Echo(proof),
+            "echo" => Message::Echo(random_idx),
             "ready" => Message::Ready([b'r'; 32]),
             "can_decode" => Message::Ready([b'r'; 32]),
             "echo_hash" => Message::Ready([b'r'; 32]),
@@ -54,7 +55,7 @@ impl Debug for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Message::Value(ref v) => f.debug_tuple("Value").field(&HexProof(v)).finish(),
-            Message::Echo(ref v) => f.debug_tuple("Echo").field(&HexProof(v)).finish(),
+            Message::Echo(ref v) => write!(f, "Echo({})", v),
             Message::Ready(ref b) => write!(f, "Ready({:0.10})", HexFmt(b)),
             Message::CanDecode(ref b) => write!(f, "CanDecode({:0.10})", HexFmt(b)),
             Message::EchoHash(ref b) => write!(f, "EchoHash({:0.10})", HexFmt(b)),
