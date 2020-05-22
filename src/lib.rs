@@ -128,6 +128,7 @@ mod traits;
 
 pub mod binary_agreement;
 pub mod broadcast;
+pub mod avid;
 pub mod dynamic_honey_badger;
 pub mod honey_badger;
 pub mod queueing_honey_badger;
