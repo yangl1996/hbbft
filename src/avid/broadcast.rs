@@ -24,6 +24,7 @@ pub struct Broadcast<N> {
     /// Our ID.
     // TODO: Make optional for observers?
     our_id: N,
+    our_share: Option<Proof<Vec<u8>>>,
     /// The set of validator IDs.
     val_set: Arc<ValidatorSet<N>>,
     /// The ID of the sending node.
@@ -53,7 +54,7 @@ pub type Step<N> = crate::CpStep<Broadcast<N>>;
 impl<N: NodeIdT> ConsensusProtocol for Broadcast<N> {
     type NodeId = N;
     type Input = Vec<u8>;
-    type Output = Self::Input;
+    type Output = Proof<Vec<u8>>;
     type Message = Message;
     type Error = Error;
     type FaultKind = FaultKind;
@@ -96,6 +97,7 @@ impl<N: NodeIdT> Broadcast<N> {
 
         Ok(Broadcast {
             our_id,
+            our_share: None,
             val_set,
             proposer_id,
             coding,
@@ -148,6 +150,20 @@ impl<N: NodeIdT> Broadcast<N> {
     /// Returns the set of all validator IDs.
     pub fn validator_set(&self) -> &Arc<ValidatorSet<N>> {
         &self.val_set
+    }
+
+    /// Checks whether the conditions for output are met for this hash, and if so, sets the output
+    /// value.
+    fn compute_output(&mut self, hash: &Digest) -> Result<Step<N>> {
+        // wait for 2n+1 Ready
+        if self.decided
+            || self.count_readys(hash) <= 2 * self.val_set.num_faulty()
+        {
+            return Ok(Step::default());
+        }
+
+        self.decided = true;
+        Ok(Step::default().with_output(self.our_share.clone()))
     }
 
     /// Breaks the input value into shards of equal length and encodes them --
@@ -244,7 +260,8 @@ impl<N: NodeIdT> Broadcast<N> {
         }
 
         // Send the `Echo` message
-        let echo_steps = self.send_echo(p)?;
+        let echo_steps = self.send_echo(p.clone())?;
+        self.our_share = Some(p);
         Ok(echo_steps)
     }
 
@@ -312,6 +329,11 @@ impl<N: NodeIdT> Broadcast<N> {
         // Upon receiving f + 1 matching Ready(h) messages, if Ready
         // has not yet been sent, multicast Ready(h).
         if self.count_readys(hash) == self.val_set.num_faulty() + 1 && !self.ready_sent {
+            // Enqueue a broadcast of a Ready message.
+            step.extend(self.send_ready(hash)?);
+        }
+
+        if self.count_readys(hash) == 2 * self.val_set.num_faulty() + 1 && !self.ready_sent {
             // Enqueue a broadcast of a Ready message.
             step.extend(self.send_ready(hash)?);
         }
