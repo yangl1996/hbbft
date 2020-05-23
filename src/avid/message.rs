@@ -14,20 +14,16 @@ pub enum Message {
     /// A share of the value, sent from the sender to another validator.
     Value(Proof<Vec<u8>>),
     /// A copy of the value received from the sender, multicast by a validator.
-    Echo(usize),
+    Echo(Digest, usize),
     /// Indicates that the sender knows that every node will eventually be able to decode.
     Ready(Digest),
-    /// Indicates that this node has enough shares to decode the message with given Merkle root.
-    CanDecode(Digest),
-    /// Indicates that sender can send an Echo for given Merkle root.
-    EchoHash(Digest),
 }
 
 // A random generation impl is provided for test cases. Unfortunately `#[cfg(test)]` does not work
 // for integration tests.
 impl Distribution<Message> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Message {
-        let message_type = *["value", "echo", "ready", "can_decode", "echo_hash"]
+        let message_type = *["value", "echo", "ready"]
             .choose(rng)
             .unwrap();
 
@@ -42,10 +38,8 @@ impl Distribution<Message> for Standard {
 
         match message_type {
             "value" => Message::Value(proof),
-            "echo" => Message::Echo(random_idx),
+            "echo" => Message::Echo([b'r'; 32], random_idx),
             "ready" => Message::Ready([b'r'; 32]),
-            "can_decode" => Message::Ready([b'r'; 32]),
-            "echo_hash" => Message::Ready([b'r'; 32]),
             _ => unreachable!(),
         }
     }
@@ -55,10 +49,8 @@ impl Debug for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Message::Value(ref v) => f.debug_tuple("Value").field(&HexProof(v)).finish(),
-            Message::Echo(ref v) => write!(f, "Echo({})", v),
+            Message::Echo(ref b, ref v) => write!(f, "Echo({}, {})", HexFmt(b), v),
             Message::Ready(ref b) => write!(f, "Ready({:0.10})", HexFmt(b)),
-            Message::CanDecode(ref b) => write!(f, "CanDecode({:0.10})", HexFmt(b)),
-            Message::EchoHash(ref b) => write!(f, "EchoHash({:0.10})", HexFmt(b)),
         }
     }
 }
